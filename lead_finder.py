@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """
-AI-Powered Lead Generation Tool for CIS Small Business
-Автор: A1VEN23
-Версия: 3.0 - CRM Architect Edition
+Lead Finder - Инструмент для поиска потенциальных клиентов из OpenStreetMap
+Автор: AI Data Engineer
+Назначение: Сбор базы клиентов с умной фильтрацией "болей" бизнеса
+БЕСПЛАТНО - без API ключей и привязки карт
 """
 
-import requests
-import csv
 import os
+import csv
 import time
+import requests
 import re
-import logging
+from urllib.parse import urlparse
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
+import logging
 import json
 
 # Настройка логирования
@@ -268,17 +270,15 @@ class OverpassAPI:
         elif element.get('center'):
             lat, lon = element['center']['lat'], element['center']['lon']
         
-        # Извлечение информации
-        info = {
-            'name': tags.get('name', 'Без названия'),
+        return {
+            'name': tags.get('name', ''),
             'phone': tags.get('phone', '') or tags.get('contact:phone', ''),
             'website': tags.get('website', '') or tags.get('contact:website', ''),
+            'address': self._format_address(tags),
             'lat': lat,
             'lon': lon,
-            'address': self._format_address(tags)
+            'tags': tags
         }
-        
-        return info
     
     def _format_address(self, tags: Dict) -> str:
         """Форматирование адреса из OSM тегов"""
@@ -363,7 +363,7 @@ class WebsiteAnalyzer:
                 matches = re.findall(pattern, content, re.IGNORECASE)
                 if matches:
                     contacts['whatsapp'] = matches[0]
-                    print(f"    📱 НАШЕЛ WHATSAPP: wa.me/{contacts['whatsapp']}")
+                    print(f"    � НАШЕЛ WHATSAPP: wa.me/{contacts['whatsapp']}")
                     break
             
             # ПРИОРИТЕТ 2: Поиск Instagram (очень важно для МСБ)
@@ -903,36 +903,32 @@ class LeadFinder:
             'address', 'category', 'city', 'is_hot_lead', 'pain_points'
         ]
         
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                
-                for lead in leads:
-                    writer.writerow({
-                        'name': lead.name,
-                        'phone': lead.phone,
-                        'website': lead.website,
-                        'rating': lead.rating,
-                        'review_count': lead.review_count,
-                        'address': lead.address,
-                        'category': lead.category,
-                        'city': lead.city,
-                        'is_hot_lead': lead.is_hot_lead,
-                        'pain_points': '; '.join(lead.pain_points)
-                    })
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
             
-            logger.info(f"✅ Сохранено {len(leads)} лидов в {filename}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка сохранения в CSV: {e}")
-            return False
+            for lead in leads:
+                writer.writerow({
+                    'name': lead.name,
+                    'phone': lead.phone or '',
+                    'website': lead.website or '',
+                    'rating': lead.rating,
+                    'review_count': lead.review_count,
+                    'address': lead.address,
+                    'category': lead.category,
+                    'city': lead.city,
+                    'is_hot_lead': lead.is_hot_lead,
+                    'pain_points': '; '.join(lead.pain_points)
+                })
+        
+        hot_leads = sum(1 for lead in leads if lead.is_hot_lead)
+        logger.info(f"Сохранено {len(leads)} лидов в {filename}")
+        logger.info(f"Горячих лидов: {hot_leads} ({hot_leads/len(leads)*100:.1f}%)")
 
 def main():
     """Главная функция - работает БЕЗ API ключей"""
-    print("🚀 Lead Finder - AI-Powered Lead Generation for CIS")
-    print("🔥 Smart analysis of Small Business pain points")
+    print("🚀 Lead Finder - OpenStreetMap Edition")
+    print("🔥 Поиск потенциальных клиентов БЕЗ API ключей")
     print("=" * 50)
     
     # Инициализация (больше не нужен API ключ!)
@@ -981,7 +977,7 @@ def main():
         
         print(f"\n✅ Все данные сохранены в leads.csv")
         print(f"🤖 Файл готов для интеграции с ИИ-звонарем!")
-        print(f"\n💡 Преимущества CRM версии:")
+        print(f"\n💡 Преимущества Growth Hacker версии:")
         print(f"   • Расширенные категории (high-ticket)")
         print(f"   • Жесткие формулировки 'болей' для конверсии")
         print(f"   • Персонализированные ice breaker'ы для ИИ-звонаря")
